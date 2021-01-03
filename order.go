@@ -176,3 +176,26 @@ func (c *Client) RecentOrders() ([]OrderOutput, error) {
 
 	return o.Results, nil
 }
+
+// GetOrder returns an order by id made by this client.
+func (c *Client) GetOrder(orderID string) (OrderOutput, error) {
+	var o OrderOutput
+
+	err := c.GetAndDecode(EPOrders + orderID, &o)
+	if err != nil {
+		return o, err
+	}
+
+	o.client = c
+
+	return o, nil
+}
+
+func (o OrderOutput) SetClient(client *Client) OrderOutput {
+	o.client = client
+	return o
+}
+
+
+
+

@@ -3,6 +3,7 @@ package robinhood
 import (
 	"bytes"
 	"math"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -62,20 +63,22 @@ type CryptoOrderOpts struct {
 
 // CryptoOrder will actually place the order
 func (c *Client) CryptoOrder(cryptoPair CryptoCurrencyPair, o CryptoOrderOpts) (*CryptoOrderOutput, error) {
-	var quantity = math.Round(o.AmountInDollars / o.Price)
+	if o.Quantity == 0 {
+		o.Quantity = math.Round(o.AmountInDollars / o.Price)
+	}
+
 	a := CryptoOrder{
 		AccountID:      c.CryptoAccount.ID,
 		CurrencyPairID: cryptoPair.ID,
-		Quantity:       quantity,
-		Price:          o.Price,
+		Quantity:       o.Quantity,
+		Price:          float64(float64(int(float64(o.Price * 100))) / 100) ,
 		RefID:          uuid.New().String(),
-		Side:           o.Side.String(),
-		TimeInForce:    o.TimeInForce.String(),
-		Type:           o.Type.String(),
+		Side:           strings.ToLower( o.Side.String()),
+		TimeInForce:    strings.ToLower( o.TimeInForce.String()),
+		Type:           strings.ToLower( o.Type.String()),
 	}
 
 	payload, err := json.Marshal(a)
-
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +99,10 @@ func (c *Client) CryptoOrder(cryptoPair CryptoCurrencyPair, o CryptoOrderOpts) (
 
 // Cancel will cancel the order
 func (o CryptoOrderOutput) Cancel() error {
+	if o.CancelURL == "" {
+		o.CancelURL = EPCryptoOrders + o.ID + "/cancel/"
+	}
+
 	post, err := http.NewRequest("POST", o.CancelURL, nil)
 	if err != nil {
 		return err
@@ -113,4 +120,23 @@ func (o CryptoOrderOutput) Cancel() error {
 	}
 
 	return nil
+}
+
+// GetOrder returns an order by id made by this client.
+func (c *Client) GetCryptoOrder(orderID string) (CryptoOrderOutput, error) {
+	var o CryptoOrderOutput
+
+	err := c.GetAndDecode(EPCryptoOrders + orderID, &o)
+	if err != nil {
+		return o, err
+	}
+
+	o.client = c
+
+	return o, nil
+}
+
+func (o CryptoOrderOutput) SetClient(client *Client) CryptoOrderOutput {
+	o.client = client
+	return o
 }
